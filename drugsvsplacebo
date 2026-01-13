@@ -1,0 +1,351 @@
+import numpy as np
+from scipy.stats import norm, uniform, iqr
+import matplotlib.pyplot as plt
+from bullet import Bullet, styles, colors
+
+def displaydrugvsplacebo(modestr, data1, data2):
+    """
+    Python version of MATLAB displaydrugvsplacebo().
+    Handles:
+        numbers
+        mean
+        median
+        percentilerange
+        bargraphrange
+        histogram
+        cumulativehistogram
+    """
+
+
+    modestr = modestr.lower()
+    f = None  # MATLAB returned handle; Python returns figure object or None
+
+    # ------------------------------------------------------------
+    # numbers (print sorted lists)
+    # ------------------------------------------------------------
+    if modestr == "numbers":
+        print()
+        print("   Drug group:    ", np.round(np.sort(data1), 2))
+        print("   Placebo group: ", np.round(np.sort(data2), 2))
+        return None
+
+    # ------------------------------------------------------------
+    # mean
+    # ------------------------------------------------------------
+    if modestr == "mean":
+        print()
+        print(f"   Drug group mean: {np.mean(data1):.2f}, N={len(data1)}.")
+        print(f"Placebo group mean: {np.mean(data2):.2f}, N={len(data2)}.")
+        return None
+
+    # ------------------------------------------------------------
+    # median
+    # ------------------------------------------------------------
+    if modestr == "median":
+        print()
+        print(f"   Drug group median: {np.median(data1):.2f}, N={len(data1)}.")
+        print(f"Placebo group median: {np.median(data2):.2f}, N={len(data2)}.")
+        return None
+
+    # ------------------------------------------------------------
+    # percentile ranges (20% / 80%)
+    # ------------------------------------------------------------
+    if modestr == "percentilerange":
+        print()
+        print(f"   Drug group: 20%={np.percentile(data1,20):.2f}, "
+              f"80%={np.percentile(data1,80):.2f}, N={len(data1)}.")
+        print(f"Placebo group: 20%={np.percentile(data2,20):.2f}, "
+              f"80%={np.percentile(data2,80):.2f}, N={len(data2)}.")
+        return None
+
+    # ------------------------------------------------------------
+    # bar graph with point overlay
+    # ------------------------------------------------------------
+    if modestr == "bargraphrange":
+        f = plt.figure()
+
+        # means as bars
+        plt.bar(1, np.mean(data1), width=0.5, color="white", edgecolor="black")
+        plt.bar(2, np.mean(data2), width=0.5, color="white", edgecolor="black")
+
+        # raw points
+        plt.plot(np.ones(len(data1)), data1, "bo")
+        plt.plot(2 * np.ones(len(data2)), data2, "gx")
+
+        plt.xticks(
+            [1, 2],
+            [f"Drug N={len(data1)}", f"Placebo N={len(data2)}"]
+        )
+        plt.ylabel("Years of life")
+
+        # match MATLAB axis adjustment
+        all_data = np.concatenate([data1, data2])
+        ymin = min(plt.ylim()[0], np.min(all_data))
+        ymax = max(plt.ylim()[1], np.max(all_data))
+        plt.ylim([ymin, ymax])
+
+        plt.box(False)
+        plt.tight_layout()
+        plt.show(block=False)
+        plt.pause(0.1)
+
+        return f
+
+    # ------------------------------------------------------------
+    # histogram (two subplots)
+    # ------------------------------------------------------------
+    if modestr == "histogram":
+        f = plt.figure()
+
+        all_data = np.concatenate([data1, data2])
+        bin_min = np.min(all_data)
+        bin_max = np.max(all_data)
+        bin_width = 2 * iqr(all_data) / ((len(data1)/2 + len(data2)/2) ** (1/3))
+        if bin_width <= 0:
+            bin_width = (bin_max - bin_min) / 10  # fallback
+
+        bins = np.arange(bin_min - bin_width, bin_max + 2*bin_width, bin_width)
+
+        # drug
+        plt.subplot(2, 1, 1)
+        plt.hist(data1, bins=bins, color="blue")
+        plt.ylabel(f"Drug group: # obs\nN={len(data1)}")
+        plt.box(False)
+
+        # placebo
+        plt.subplot(2, 1, 2)
+        plt.hist(data2, bins=bins, color="green")
+        plt.ylabel(f"Placebo group: # obs\nN={len(data2)}")
+        plt.xlabel("Years of life")
+        plt.box(False)
+
+        plt.tight_layout()
+        plt.show(block=False)
+        plt.pause(0.1)
+
+        return f
+
+    # ------------------------------------------------------------
+    # cumulative histogram
+    # ------------------------------------------------------------
+    if modestr == "cumulativehistogram":
+        f = plt.figure()
+
+        all_data = np.concatenate([data1, data2])
+        bin_min = np.min(all_data)
+        bin_max = np.max(all_data)
+        bin_width = 2 * iqr(all_data) / ((len(data1)/2 + len(data2)/2) ** (1/3))
+        if bin_width <= 0:
+            bin_width = (bin_max - bin_min) / 10
+
+        # MATLAB style: X is percentiles from 0 to 100
+        percent = np.arange(0, 101)
+
+        X1 = np.concatenate((
+            [bin_min - bin_width],
+            np.percentile(data1, percent),
+            [bin_max + bin_width]
+        ))
+        X2 = np.concatenate((
+            [bin_min - bin_width],
+            np.percentile(data2, percent),
+            [bin_max + bin_width]
+        ))
+
+        Y = np.concatenate(([0], percent, [100]))  # cumulative
+
+        plt.plot(X1, Y, "b-")
+        plt.plot(X2, Y, "g-")
+        plt.xlabel("Years of life")
+        plt.ylabel("Fraction of observations")
+        plt.legend(
+            [f"Drug group, N={len(data1)}",
+             f"Placebo group, N={len(data2)}"],
+            loc="lower right"
+        )
+        plt.box(False)
+        plt.tight_layout()
+        plt.show(block=False)
+        plt.pause(0.1)
+
+        return f
+
+    # ------------------------------------------------------------
+    # fallback
+    # ------------------------------------------------------------
+    print(f"[displaydrugvsplacebo] Unknown mode '{modestr}'")
+    return None
+
+
+def generate_random_data(N, distribution, param1, param2):
+    """
+    distribution : 'normal' or 'uniform'
+    param1, param2 : distribution parameters
+    """
+    u = np.random.rand(N)
+
+    if distribution.lower() == "normal":
+        return norm.ppf(u, loc=param1, scale=param2)
+
+    elif distribution.lower() == "uniform":
+        return uniform.ppf(u, loc=param1, scale=param2)
+
+    else:
+        raise ValueError(f"Unsupported distribution: {distribution}")
+
+def drugvsplacebo(mode="numbers"):
+    """
+    Python version of DRUGVSPLACEBO.
+
+    Parameters
+    ----------
+    mode : str
+        One of:
+        'numbers', 'mean', 'median', 'percentilerange',
+        'bargraphrange', 'histogram', 'cumulativehistogram'
+    """
+
+    modestr = mode.lower()
+    print(modestr)
+    # 1 — Generate dataset parameters
+    dist1 = "normal"
+    dist2 = "normal"
+
+    stddev = np.array([0.1, 0.5, 1, 2, 3])
+    mn1 = np.random.randn()
+    mn2 = np.random.randn()
+
+    # Random selection of s1 and s2
+    s1 = np.random.permutation(len(stddev))[0]
+    s2_temp = np.random.permutation(3)[0]
+
+    if s1 == 0:
+        s2 = s2_temp
+    elif s1 == len(stddev) - 1:
+        s2 = len(stddev) + (s2_temp - 3)
+    else:
+        s2 = (s2_temp - 2) + s1
+
+    # Parameters: (mean, std)
+    params1 = (stddev[s1] * mn1, stddev[s1])
+    params2 = (stddev[s2] * mn2, stddev[s2])
+
+    code = np.mod(int(1000 * np.random.rand()), 1000)
+    printcode = False
+    orig_modestr = modestr
+
+    if (np.random.rand() - 1) < code and modestr.startswith("*"):
+        params2 = params1
+        modestr = modestr[1:]
+        printcode = True
+
+    # 2 — Determine N1, N2
+    if modestr == "numbers":
+        N1, N2 = 10, 10
+    else:
+        # Draw log-uniform
+        ns = uniform.ppf(np.random.rand(2), np.log(10), np.log(2000))
+        N1 = int(np.ceil(np.exp(ns[0])))
+        N2 = int(np.ceil(np.exp(ns[1])))
+
+    # 3 — Generate data
+    data1 = generate_random_data(N1, dist1, *params1)
+    data2 = generate_random_data(N2, dist2, *params2)
+
+    # 4 — Display the data (placeholder)
+    displaydrugvsplacebo(modestr, data1, data2)
+# Create a Bullet object with a prompt and choices
+    cli = Bullet(
+        prompt = "Do you think one choice is a lot better?  ",
+        choices = ["much better", "slightly better", "no difference" ],
+        bullet = " >",  # Custom bullet character
+        align = 3,      # Alignment of the choices
+        margin = 2,     # Margin around the choices
+        shift = 0,      # Horizontal shift of the choices
+        indent = 0,     # Indentation of the choices
+        word_color = styles.colors.foreground["yellow"], # Color for the prompt text
+        word_on_switch = styles.colors.foreground["cyan"], # Color for the selected choice
+        background_color = styles.colors.background["black"], # Background color
+        background_on_switch = styles.colors.background["red"] # Background color for selected choice
+    )
+
+    # Get the user's selected choice
+    result_better = cli.launch()
+
+    # Create a Bullet object with a prompt and choices
+    cli = Bullet(
+        prompt = "Which do you choose? (drug/placebo): ",
+        choices = ["drug", "placebo" ],
+        bullet = " >",  # Custom bullet character
+        align = 2,      # Alignment of the choices
+        margin = 2,     # Margin around the choices
+        shift = 0,      # Horizontal shift of the choices
+        indent = 0,     # Indentation of the choices
+        word_color = styles.colors.foreground["yellow"], # Color for the prompt text
+        word_on_switch = styles.colors.foreground["cyan"], # Color for the selected choice
+        background_color = styles.colors.background["black"], # Background color
+        background_on_switch = styles.colors.background["red"] # Background color for selected choice
+    )
+
+    # Get the user's selected choice
+    result = cli.launch()
+
+    # 6 — Single-user simulation
+    user_drug = generate_random_data(1, dist1, *params1)[0]
+    user_placebo = generate_random_data(1, dist2, *params2)[0]
+
+    many_drug = generate_random_data(100, dist1, *params1)
+    many_placebo = generate_random_data(100, dist2, *params2)
+
+    better = "drug" if user_drug > user_placebo else "placebo"
+
+    print("\n================ RESULTS ================\n")
+    print(f"You chose {result} and said one choice was '{result_better}'.\n")
+    print(f"If you took the drug, you'd have lived {user_drug:.2f} years.")
+    print(f"If you took the placebo, you'd have lived {user_placebo:.2f} years.")
+    print(f"You were better off with the {better}.\n")
+
+    print(f"If 100 people took the drug, they'd live on average {np.mean(many_drug):.2f} years.")
+    print(f"If 100 people took the placebo, they'd live on average {np.mean(many_placebo):.2f} years.")
+    percent = np.mean(many_drug > many_placebo) * 100
+    print(f"{percent:.1f}% of 100 people are better off with the drug.\n")
+
+    if printcode:
+        print(f"Secret code was: {code:03d}")
+
+# Create a Bullet object with a prompt and choices
+    cli = Bullet(
+        prompt = "Would you like to play again?",
+        choices = ["yes", "no"],
+        bullet = " >",  # Custom bullet character
+        align = 2,      # Alignment of the choices
+        margin = 2,     # Margin around the choices
+        shift = 0,      # Horizontal shift of the choices
+        indent = 0,     # Indentation of the choices
+        word_color = styles.colors.foreground["yellow"], # Color for the prompt text
+        word_on_switch = styles.colors.foreground["cyan"], # Color for the selected choice
+        background_color = styles.colors.background["black"], # Background color
+        background_on_switch = styles.colors.background["red"] # Background color for selected choice
+    )
+
+    # Get the user's selected choice
+    result_yesno = cli.launch()
+
+    if result_yesno == "yes":
+        drugvsplacebo(orig_modestr)
+
+    plt.show()
+
+import sys
+command = "numbers"
+
+if __name__ == "__main__":
+    if ( len(sys.argv) < 2) :
+        command = "numbers"
+    elif (len(sys.argv) > 1):
+        command = sys.argv[1]
+    else:   
+        command = "numbers"
+
+    print(command)
+    drugvsplacebo(command)
